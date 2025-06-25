@@ -13,7 +13,7 @@ export default function HomePage() {
       <header className="bg-white shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <nav className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-slate-900">Ujwal</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Ujwal Kumar - Fintech Specialist</h1>
             <div className="flex gap-4">
               <Button variant="ghost" size="sm">
                 About
