@@ -10,10 +10,36 @@ export function ContactForm() {
   const [formData, setFormData] = useState({ name: "", email: "", message: "" })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState("")
+  const [emailError, setEmailError] = useState("")
+
+  // Email validation function
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value
+    setFormData({ ...formData, email })
+
+    if (email && !validateEmail(email)) {
+      setEmailError("Please enter a valid email address")
+    } else {
+      setEmailError("")
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate email before submission
+    if (!validateEmail(formData.email)) {
+      setEmailError("Please enter a valid email address")
+      return
+    }
+
     setIsSubmitting(true)
+    setSubmitMessage("")
 
     try {
       const response = await fetch("/api/contact", {
@@ -23,10 +49,12 @@ export function ContactForm() {
       })
 
       const result = await response.json()
-      setSubmitMessage(result.message)
 
       if (result.success) {
+        setSubmitMessage("Thank you! Your message has been sent successfully.")
         setFormData({ name: "", email: "", message: "" })
+      } else {
+        setSubmitMessage(result.message || "Failed to send message. Please try again.")
       }
     } catch (error) {
       setSubmitMessage("Failed to send message. Please try again.")
@@ -49,7 +77,7 @@ export function ContactForm() {
               <input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md"
+                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 required
               />
             </div>
@@ -58,10 +86,13 @@ export function ContactForm() {
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md"
+                onChange={handleEmailChange}
+                className={`w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                  emailError ? "border-red-500" : "border-slate-300"
+                }`}
                 required
               />
+              {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
             </div>
           </div>
           <div>
@@ -69,14 +100,26 @@ export function ContactForm() {
             <textarea
               value={formData.message}
               onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md h-24"
+              className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md h-24 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               required
             />
           </div>
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="w-full bg-primary hover:bg-primary/90"
+            disabled={isSubmitting || !!emailError}
+          >
             {isSubmitting ? "Sending..." : "Send Message"}
           </Button>
-          {submitMessage && <p className="text-sm text-center mt-2">{submitMessage}</p>}
+          {submitMessage && (
+            <p
+              className={`text-sm text-center mt-2 ${
+                submitMessage.includes("successfully") ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {submitMessage}
+            </p>
+          )}
         </form>
       </CardContent>
     </Card>
