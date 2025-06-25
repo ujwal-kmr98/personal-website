@@ -1,127 +1,81 @@
-"use client"
+import { type NextRequest, NextResponse } from "next/server"
 
-import type React from "react"
+export async function POST(request: NextRequest) {
+  try {
+    const { name, email, message } = await request.json()
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+    // Validate the input
+    if (!name || !email || !message) {
+      return NextResponse.json({ success: false, message: "All fields are required" }, { status: 400 })
+    }
 
-export function ContactForm() {
-  const [formData, setFormData] = useState({ name: "", email: "", message: "" })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitMessage, setSubmitMessage] = useState("")
-  const [emailError, setEmailError] = useState("")
-
-  // Email validation function
-  const validateEmail = (email: string) => {
+    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
-  }
-
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const email = e.target.value
-    setFormData({ ...formData, email })
-
-    if (email && !validateEmail(email)) {
-      setEmailError("Please enter a valid email address")
-    } else {
-      setEmailError("")
-    }
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    // Validate email before submission
-    if (!validateEmail(formData.email)) {
-      setEmailError("Please enter a valid email address")
-      return
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ success: false, message: "Invalid email address" }, { status: 400 })
     }
 
-    setIsSubmitting(true)
-    setSubmitMessage("")
+    // Using Resend to send email
+    const resendApiKey = process.env.RESEND_API_KEY
 
-    try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        setSubmitMessage("Thank you! Your message has been sent successfully.")
-        setFormData({ name: "", email: "", message: "" })
-      } else {
-        setSubmitMessage(result.message || "Failed to send message. Please try again.")
-      }
-    } catch (error) {
-      setSubmitMessage("Failed to send message. Please try again.")
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY is not configured")
+      return NextResponse.json({ success: false, message: "Email service not configured" }, { status: 500 })
     }
 
-    setIsSubmitting(false)
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Send a Message</CardTitle>
-        <CardDescription>I'd love to hear from you!</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium">Name</label>
-              <input
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Email</label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={handleEmailChange}
-                className={`w-full mt-1 px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
-                  emailError ? "border-red-500" : "border-slate-300"
-                }`}
-                required
-              />
-              {emailError && <p className="text-red-500 text-xs mt-1">{emailError}</p>}
+    const emailData = {
+      from: "Contact Form <onboarding@resend.dev>", // Using Resend's default domain
+      to: ["ujwalkkumar9@gmail.com"],
+      subject: `New Contact Form Message from ${name}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #10B981;">New Contact Form Submission</h2>
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Name:</strong> ${name}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Message:</strong></p>
+            <div style="background-color: white; padding: 15px; border-radius: 4px; margin-top: 10px;">
+              ${message.replace(/\n/g, "<br>")}
             </div>
           </div>
-          <div>
-            <label className="text-sm font-medium">Message</label>
-            <textarea
-              value={formData.message}
-              onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-              className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md h-24 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              required
-            />
-          </div>
-          <Button
-            type="submit"
-            className="w-full bg-primary hover:bg-primary/90"
-            disabled={isSubmitting || !!emailError}
-          >
-            {isSubmitting ? "Sending..." : "Send Message"}
-          </Button>
-          {submitMessage && (
-            <p
-              className={`text-sm text-center mt-2 ${
-                submitMessage.includes("successfully") ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {submitMessage}
-            </p>
-          )}
-        </form>
-      </CardContent>
-    </Card>
-  )
+          <p style="color: #666; font-size: 12px;">
+            This message was sent from your website contact form at ${new Date().toLocaleString()}
+          </p>
+        </div>
+      `,
+      text: `
+        New Contact Form Submission
+        
+        Name: ${name}
+        Email: ${email}
+        Message: ${message}
+        
+        Sent at: ${new Date().toLocaleString()}
+      `,
+    }
+
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(emailData),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      console.error("Resend API error:", errorData)
+      return NextResponse.json({ success: false, message: "Failed to send email" }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Message sent successfully!",
+    })
+  } catch (error) {
+    console.error("Contact form error:", error)
+    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 })
+  }
 }
+
