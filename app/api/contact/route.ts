@@ -4,19 +4,26 @@ export async function POST(request: NextRequest) {
   try {
     const { name, email, message } = await request.json()
 
+    // Add detailed logging for debugging
+    console.log("Contact form submission received:", { name, email, message: message?.substring(0, 50) + "..." })
+
     // Validate the input
     if (!name || !email || !message) {
+      console.log("Validation failed: Missing required fields")
       return NextResponse.json({ success: false, message: "All fields are required" }, { status: 400 })
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
+      console.log("Validation failed: Invalid email format")
       return NextResponse.json({ success: false, message: "Invalid email address" }, { status: 400 })
     }
 
-    // Using Resend to send email
+    // Check for Resend API key
     const resendApiKey = process.env.RESEND_API_KEY
+    console.log("Resend API key exists:", !!resendApiKey)
+    console.log("Resend API key starts with:", resendApiKey?.substring(0, 10) + "...")
 
     if (!resendApiKey) {
       console.error("RESEND_API_KEY is not configured")
@@ -24,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const emailData = {
-      from: "Contact Form <onboarding@resend.dev>", // Using Resend's default domain
+      from: "Contact Form <onboarding@resend.dev>",
       to: ["ujwalkkumar9@gmail.com"],
       subject: `New Contact Form Message from ${name}`,
       html: `
@@ -54,6 +61,8 @@ export async function POST(request: NextRequest) {
       `,
     }
 
+    console.log("Attempting to send email via Resend API...")
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -63,11 +72,22 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify(emailData),
     })
 
+    console.log("Resend API response status:", response.status)
+
     if (!response.ok) {
       const errorData = await response.json()
       console.error("Resend API error:", errorData)
-      return NextResponse.json({ success: false, message: "Failed to send email" }, { status: 500 })
+      return NextResponse.json(
+        {
+          success: false,
+          message: `Failed to send email: ${errorData.message || "Unknown error"}`,
+        },
+        { status: 500 },
+      )
     }
+
+    const result = await response.json()
+    console.log("Email sent successfully:", result)
 
     return NextResponse.json({
       success: true,
@@ -75,7 +95,12 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Contact form error:", error)
-    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: `Internal server error: ${error instanceof Error ? error.message : "Unknown error"}`,
+      },
+      { status: 500 },
+    )
   }
 }
-
